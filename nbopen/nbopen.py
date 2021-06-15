@@ -1,15 +1,18 @@
 #!/usr/bin/python3
-
 import argparse
 import os.path
 import webbrowser
-
 from notebook import notebookapp
 from notebook.utils import url_path_join, url_escape
 import nbformat
-from traitlets.config import Config
+import subprocess
+import time
 
-def find_best_server(filename):
+# c_mode = "notebook"
+c_mode = "lab"
+
+
+def find_best_server(filename: str) -> int:
     servers = [si for si in notebookapp.list_running_servers()
                if filename.startswith(si['notebook_dir'])]
     try:
@@ -18,40 +21,39 @@ def find_best_server(filename):
         return None
 
 
-def nbopen(filename):
+def nbopen(filename: str):
     filename = os.path.abspath(filename)
     home_dir = os.path.expanduser('~')
     server_inf = find_best_server(filename)
-    if server_inf is not None:
-        print("Using existing server at", server_inf['notebook_dir'])
-        path = os.path.relpath(filename, start=server_inf['notebook_dir'])
-        if os.sep != '/':
-            path = path.replace(os.sep, '/')
-        url = url_path_join(server_inf['url'], 'notebooks', url_escape(path))
-        na = notebookapp.NotebookApp.instance()
-        na.load_config_file()
-        browser = webbrowser.get(na.browser or None)
-        browser.open(url, new=2)
-    else:
+    if server_inf is None:
         if filename.startswith(home_dir):
             nbdir = home_dir
         else:
             nbdir = os.path.dirname(filename)
 
         print("Starting new server")
-        # Hack: we want to override these settings if they're in the config file.
-        # The application class allows 'command line' config to override config
-        # loaded afterwards from the config file. So by specifying config, we
-        # can use this mechanism.
-        cfg = Config()
-        cfg.NotebookApp.file_to_run = os.path.abspath(filename)
-        cfg.NotebookApp.notebook_dir = nbdir
-        cfg.NotebookApp.open_browser = True
-        notebookapp.launch_new_instance(config=cfg,
-                                        argv=[],  # Avoid it seeing our own argv
-                                        )
+        # to get server with find_best_server,
+        # launch app by jupyter-notebook
+        # even if you use JupyterLab
+        subprocess.run(["jupyter-notebook", "--no-browser", nbdir, "&"])
 
-def nbnew(filename):
+    while server_inf is None:
+        time.sleep(0.1)
+        server_inf = find_best_server(filename)
+
+    print("Using existing server at", server_inf['notebook_dir'])
+    path = os.path.relpath(filename, start=server_inf['notebook_dir'])
+    if os.sep != '/':
+        path = path.replace(os.sep, '/')
+    if c_mode == "notebook":
+        url = url_path_join(server_inf['url'], 'notebooks', url_escape(path))
+    elif c_mode == "lab":
+        url = url_path_join(server_inf['url'], 'lab/tree', url_escape(path))
+    browser = webbrowser.get(None)
+    browser.open(url, new=0)
+
+
+def nbnew(filename: str) -> str:
     if not filename.endswith('.ipynb'):
         filename += '.ipynb'
     if os.path.exists(filename):
@@ -63,6 +65,7 @@ def nbnew(filename):
         nbformat.write(nb_version.new_notebook(),
                        filename)
     return filename
+
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
@@ -77,6 +80,7 @@ def main(argv=None):
         filename = args.filename
 
     nbopen(filename)
+
 
 if __name__ == '__main__':
     main()
