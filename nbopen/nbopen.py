@@ -7,9 +7,11 @@ from notebook.utils import url_path_join, url_escape
 import nbformat
 import subprocess
 import time
+import timeout_decorator
 
 # c_mode = "notebook"
 c_mode = "lab"
+c_timeout = 10
 
 
 def find_best_server(filename: str) -> int:
@@ -19,6 +21,14 @@ def find_best_server(filename: str) -> int:
         return max(servers, key=lambda si: len(si['notebook_dir']))
     except ValueError:
         return None
+
+
+@timeout_decorator.timeout(c_timeout)
+def wait_best_server(filename: str, server_inf):
+    while server_inf is None:
+        time.sleep(0.1)
+        server_inf = find_best_server(filename)
+    return server_inf
 
 
 def nbopen(filename: str):
@@ -35,11 +45,11 @@ def nbopen(filename: str):
         # to get server with find_best_server,
         # launch app by jupyter-notebook
         # even if you use JupyterLab
-        subprocess.run(["jupyter-notebook", "--no-browser", nbdir, "&"])
+        subprocess.Popen(["jupyter-notebook", "--no-browser", nbdir],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
 
-    while server_inf is None:
-        time.sleep(0.1)
-        server_inf = find_best_server(filename)
+    server_inf = wait_best_server(filename, server_inf)
 
     print("Using existing server at", server_inf['notebook_dir'])
     path = os.path.relpath(filename, start=server_inf['notebook_dir'])
