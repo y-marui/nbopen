@@ -2,6 +2,7 @@ __pycache__
 build/
 dist/
 MANIFEST
+nbopen.icns
 
 ### https://raw.github.com/github/gitignore/5d896f6791c4257b74696714c66b2530b8d95a51/Python.gitignore
 
