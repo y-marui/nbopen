@@ -8,10 +8,18 @@ import nbformat
 import subprocess
 import time
 import timeout_decorator
+from traitlets.config.configurable import Configurable
+from traitlets import Int
 
-# c_mode = "notebook"
-c_mode = "lab"
-c_timeout = 10
+from .traitlets import ModeString
+
+
+class Opener(Configurable):
+    mode = ModeString(config=True)
+    timeout = Int(config=True)
+
+
+opener = Opener()
 
 
 def find_best_server(filename: str) -> int:
@@ -23,7 +31,7 @@ def find_best_server(filename: str) -> int:
         return None
 
 
-@timeout_decorator.timeout(c_timeout)
+@timeout_decorator.timeout(opener.timeout)
 def wait_best_server(filename: str, server_inf):
     while server_inf is None:
         time.sleep(0.1)
@@ -55,9 +63,9 @@ def nbopen(filename: str):
     path = os.path.relpath(filename, start=server_inf['notebook_dir'])
     if os.sep != '/':
         path = path.replace(os.sep, '/')
-    if c_mode == "notebook":
+    if opener.mode == "notebook":
         url = url_path_join(server_inf['url'], 'notebooks', url_escape(path))
-    elif c_mode == "lab":
+    elif opener.mode == "lab":
         url = url_path_join(server_inf['url'], 'lab/tree', url_escape(path))
     browser = webbrowser.get(None)
     browser.open(url, new=0)
